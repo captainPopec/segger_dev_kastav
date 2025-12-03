@@ -4,7 +4,11 @@ import glob
 import os
 from pathlib import Path
 import torch
+import torch.serialization
+from torch_geometric.data.storage import BaseStorage
 
+# allow PyTorch Geometric graph objects to unpickle
+torch.serialization.add_safe_globals([BaseStorage])
 
 class STPyGDataset(InMemoryDataset):
     """
@@ -64,7 +68,7 @@ class STPyGDataset(InMemoryDataset):
             Data: The processed data object.
         """
         filepath = Path(self.processed_dir) / self.processed_file_names[idx]
-        data = torch.load(filepath)
+        data = torch.load(filepath, weights_only=False)
         # this is an issue in PyG's RandomLinkSplit, dimensions are not consistent if there is only one edge in the graph
         if hasattr(data["tx", "belongs", "bd"], "edge_label_index"):
             if data["tx", "belongs", "bd"].edge_label_index.dim() == 1:
