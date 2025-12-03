@@ -4,11 +4,6 @@ import glob
 import os
 from pathlib import Path
 import torch
-import torch.serialization
-from torch_geometric.data.storage import BaseStorage
-
-# allow PyTorch Geometric graph objects to unpickle
-torch.serialization.add_safe_globals([BaseStorage])
 
 class STPyGDataset(InMemoryDataset):
     """
