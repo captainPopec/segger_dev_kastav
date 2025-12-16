@@ -25,6 +25,7 @@ transcripts:
     - "cell_id"
     - "overlaps_nucleus"
     - "transcript_id"
+    - "EntityID"
 
 boundaries:
   filename: "cellpose_nucleus_micron_space.parquet"
