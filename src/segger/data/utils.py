@@ -164,6 +164,9 @@ def create_anndata(
     Returns:
         ad.AnnData: The generated AnnData object containing the transcriptomics data and metadata.
     """
+    # adjust df to fit into prediction workflow names
+    df = df.rename(columns={'gene': 'feature_name'})
+    
     # Filter out unassigned cells
     df_filtered = df[df[cell_id_col].astype(str) != "UNASSIGNED"]
 
@@ -181,7 +184,7 @@ def create_anndata(
         if len(cell_data) < min_transcripts:
             continue
         cell_convex_hull = ConvexHull(
-            cell_data[["x_location", "y_location"]], qhull_options="QJ"
+            cell_data[["global_x", "global_y"]], qhull_options="QJ"
         )
         cell_area = cell_convex_hull.area
         if cell_area < min_cell_area or cell_area > max_cell_area:
@@ -189,8 +192,8 @@ def create_anndata(
         cell_summary.append(
             {
                 "cell": cell_id,
-                "cell_centroid_x": cell_data["x_location"].mean(),
-                "cell_centroid_y": cell_data["y_location"].mean(),
+                "cell_centroid_x": cell_data["global_x"].mean(),
+                "cell_centroid_y": cell_data["global_y"].mean(),
                 "cell_area": cell_area,
             }
         )
