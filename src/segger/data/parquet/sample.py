@@ -1249,7 +1249,12 @@ class STTile:
         # Ensure self.boundaries is a GeoDataFrame with correct geometry
         self.boundaries = gpd.GeoDataFrame(self.boundaries.copy(), geometry=polygons)
         centroids = polygons.centroid.get_coordinates()
-        pyg_data["bd"].id = polygons.index.to_numpy()
+        #pyg_data["bd"].id = polygons.index.to_numpy()
+        cell_id_col = self.settings.boundaries.id  # biological cell ID column
+        pyg_data["bd"].id = torch.tensor(
+            self.boundaries[cell_id_col].values,
+            dtype=torch.long
+         )
         pyg_data["bd"].pos = torch.tensor(centroids.values, dtype=torch.float32)
         pyg_data["bd"].x = self.get_boundary_props(
             area, convexity, elongation, circularity
@@ -1276,6 +1281,8 @@ class STTile:
         # Now we identify and split the tx-belongs-bd edges
         edge_type = ("tx", "belongs", "bd")
 
+###################################
+        '''
         # Find nuclear transcripts
         tx_cell_ids = self.transcripts[self.settings.boundaries.id]
         cell_ids_map = {idx: i for (i, idx) in enumerate(polygons.index)}
@@ -1301,6 +1308,48 @@ class STTile:
         row_idx = np.where(is_nuclear)[0]
         col_idx = tx_cell_ids.iloc[row_idx].map(cell_ids_map)
         blng_edge_idx = torch.tensor(np.stack([row_idx, col_idx])).long()
+        '''
+        # Biological cell IDs for each transcript
+        cell_id_col = self.settings.boundaries.id
+        tx_cell_ids = self.transcripts[cell_id_col].values
+
+        # Map biological cell_id -> LOCAL boundary node index
+        bd_cell_ids = self.boundaries[cell_id_col].values
+        cell_id_to_local = {
+            cid: i for i, cid in enumerate(bd_cell_ids)
+        }
+
+        # Identify nuclear transcripts
+        nuclear_column = getattr(self.settings.transcripts, "nuclear_column", None)
+        nuclear_value = getattr(self.settings.transcripts, "nuclear_value", None)
+
+        if nuclear_column is None or self.settings.boundaries.scale_factor != 1.0:
+            is_nuclear = utils.compute_nuclear_transcripts(
+                polygons=polygons,
+                transcripts=self.transcripts,
+                x_col=self.settings.transcripts.x,
+                y_col=self.settings.transcripts.y,
+                nuclear_column=nuclear_column,
+                nuclear_value=nuclear_value,
+            )
+        else:
+            is_nuclear = self.transcripts[nuclear_column].eq(nuclear_value)
+    
+        # Keep only transcripts whose cell exists in THIS tile
+        valid = np.array([cid in cell_id_to_local for cid in tx_cell_ids])
+        is_nuclear &= valid
+
+        row_idx = np.where(is_nuclear)[0]
+        col_idx = np.array([cell_id_to_local[tx_cell_ids[i]] for i in row_idx])
+
+        blng_edge_idx = torch.tensor(
+            np.stack([row_idx, col_idx]),
+            dtype=torch.long
+        )
+
+        pyg_data["tx", "belongs", "bd"].edge_index = blng_edge_idx
+
+##################################
         pyg_data[edge_type].edge_index = blng_edge_idx
 
         # If there are no tx-belongs-bd edges, flag tile as test only (cannot be used for training)
