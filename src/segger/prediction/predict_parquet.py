@@ -377,7 +377,8 @@ def predict_batch(
 
             mask = assignments["score"] >= score_cut  # Mask for assigned transcripts
             cp.cuda.Stream.null.synchronize()
-            all_ids = np.concatenate(batch["bd"].id)  # Boundary IDs as NumPy array
+            #all_ids = np.concatenate(batch["bd"].id)  # Boundary IDs as NumPy array
+            all_ids = batch["bd"].id.detach().cpu().numpy()
             assignments["segger_cell_id"] = np.where(
                 mask, all_ids[cp.argmax(dense_scores, axis=1).get()], None
             )
